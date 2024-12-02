@@ -1,0 +1,47 @@
+name: Kestra CI/CD
+
+on: 
+  push:
+    branches:
+      - main
+    paths:
+      - 'kestra/workflows/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'kestra/workflows/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    name: Kestra Validate Flows
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Validate Flows
+        uses: kestra-io/validate-action@develop
+        with:
+          directory: ./kestra/workflows
+          resource: flow
+          server: ${{ secrets.KESTRA_HOSTNAME }}
+          apiToken: ${{ secrets.KESTRA_API_TOKEN }}
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    name: Kestra Deploy Flows
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Deploy Workflows
+        uses: kestra-io/deploy-action@master
+        with:
+          namespace: whiztask
+          directory: ./kestra/workflows
+          resource: flow
+          server: ${{ secrets.KESTRA_HOSTNAME }}
+          apiToken: ${{ secrets.KESTRA_API_TOKEN }}
+          delete: false  # Preserve existing flows

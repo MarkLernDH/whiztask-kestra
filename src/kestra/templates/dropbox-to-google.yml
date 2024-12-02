@@ -1,0 +1,30 @@
+id: dropbox_to_google_drive
+namespace: whiztask.templates
+
+inputs:
+  - name: dropbox_token
+    type: STRING
+    required: true
+  - name: google_credentials
+    type: STRING
+    required: true
+  - name: source_path
+    type: STRING
+    required: true
+  - name: destination_path
+    type: STRING
+    required: true
+
+tasks:
+  - id: fetch_from_dropbox
+    type: io.kestra.plugin.dropbox.Download
+    config:
+      token: "{{ inputs.dropbox_token }}"
+      path: "{{ inputs.source_path }}"
+    
+  - id: upload_to_google
+    type: io.kestra.plugin.googleworkspace.drive.Upload
+    config:
+      credentials: "{{ inputs.google_credentials }}"
+      content: "{{ outputs.fetch_from_dropbox.uri }}"
+      path: "{{ inputs.destination_path }}"

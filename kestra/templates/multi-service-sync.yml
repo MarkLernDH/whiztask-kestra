@@ -1,0 +1,133 @@
+id: multi-service-sync
+namespace: whiztask
+name: Multi-Service Data Sync
+
+description: |
+  This workflow demonstrates how to combine different integration approaches in Kestra:
+  1. Direct API calls using Python requests
+  2. Airbyte connector through Docker
+  3. Custom data processing with pandas
+  4. External service integration through HTTP tasks
+
+inputs:
+  - name: source_type
+    type: string
+    required: true
+  - name: source_config
+    type: object
+    required: true
+  - name: destination_type
+    type: string
+    required: true
+  - name: destination_config
+    type: object
+    required: true
+
+tasks:
+  # 1. API-based data fetch
+  - id: fetch-source-data
+    type: io.kestra.core.tasks.scripts.Python
+    inputFiles:
+      requirements.txt: |
+        requests==2.31.0
+        pandas==2.1.3
+    script: |
+      import requests
+      import json
+      import pandas as pd
+      
+      source_type = "{{ inputs.source_type }}"
+      source_config = {{ inputs.source_config }}
+      
+      # Example API call to source system
+      response = requests.get(
+          source_config["url"],
+          headers=source_config.get("headers", {})
+      )
+      data = response.json()
+      
+      # Convert to DataFrame for easier processing
+      df = pd.DataFrame(data)
+      
+      # Save as CSV for next steps
+      df.to_csv("/tmp/source_data.csv", index=False)
+      print(f"Saved {len(df)} records to CSV")
+
+  # 2. Airbyte-based sync (if needed)
+  - id: airbyte-sync
+    type: io.kestra.core.tasks.flows.Switch
+    value: "{{ inputs.source_type }}"
+    cases:
+      AIRBYTE:
+        - id: run-airbyte-sync
+          type: io.kestra.core.tasks.scripts.Script
+          runner: DOCKER
+          image: airbyte/airbyte-bootloader:latest
+          commands:
+            - python -m airbyte_api.sync \
+              --config '{{ inputs.source_config }}' \
+              --destination '{{ inputs.destination_config }}'
+
+  # 3. Custom data processing
+  - id: transform-data
+    type: io.kestra.core.tasks.scripts.Python
+    inputFiles:
+      requirements.txt: |
+        pandas==2.1.3
+        numpy==1.26.2
+    script: |
+      import pandas as pd
+      import numpy as np
+      
+      # Load data
+      df = pd.read_csv("/tmp/source_data.csv")
+      
+      # Example transformations
+      df['processed_at'] = pd.Timestamp.now()
+      df['value_normalized'] = (df['value'] - df['value'].mean()) / df['value'].std()
+      
+      # Save processed data
+      df.to_csv("/tmp/processed_data.csv", index=False)
+      print(f"Processed {len(df)} records")
+
+  # 4. External service integration
+  - id: send-to-destination
+    type: io.kestra.core.tasks.flows.Switch
+    value: "{{ inputs.destination_type }}"
+    cases:
+      API:
+        - id: api-upload
+          type: io.kestra.core.tasks.scripts.Python
+          inputFiles:
+            requirements.txt: |
+              requests==2.31.0
+              pandas==2.1.3
+          script: |
+            import requests
+            import pandas as pd
+            
+            df = pd.read_csv("/tmp/processed_data.csv")
+            data = df.to_dict(orient='records')
+            
+            response = requests.post(
+                "{{ inputs.destination_config.url }}",
+                json=data,
+                headers={{ inputs.destination_config.headers }}
+            )
+            print(f"Upload response: {response.status_code}")
+      
+      S3:
+        - id: s3-upload
+          type: io.kestra.plugin.aws.s3.Upload
+          accessKey: "{{ inputs.destination_config.access_key }}"
+          secretKey: "{{ inputs.destination_config.secret_key }}"
+          region: "{{ inputs.destination_config.region }}"
+          bucket: "{{ inputs.destination_config.bucket }}"
+          from: "/tmp/processed_data.csv"
+          key: "{{ outputs.date }}/data.csv"
+
+  # 5. Cleanup
+  - id: cleanup
+    type: io.kestra.core.tasks.scripts.Bash
+    commands:
+      - rm -f /tmp/source_data.csv /tmp/processed_data.csv

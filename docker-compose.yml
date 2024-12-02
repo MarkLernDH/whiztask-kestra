@@ -1,0 +1,34 @@
+services:
+  # Kestra service
+  kestra:
+    image: kestra/kestra:latest
+    command: server standalone --config /etc/config/application.yaml
+    user: "1000:1000"  # Use a specific UID:GID
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+    environment:
+      KESTRA_CONFIGURATION_DIRECTORY: "/app/workflows"
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+    volumes:
+      - ./application.yaml:/etc/config/application.yaml
+      - ./kestra/workflows:/app/workflows
+      - ./kestra/templates:/app/templates
+      - ./kestra/storage:/app/storage
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "54322:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+    driver: local

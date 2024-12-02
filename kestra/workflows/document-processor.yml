@@ -1,0 +1,168 @@
+id: document-processor
+namespace: marketplace.documents
+
+description: |
+  Automated document processing pipeline that extracts information from various document types,
+  generates summaries, and organizes files in cloud storage with metadata.
+
+inputs:
+  - id: document_url
+    type: STRING
+    required: true
+    description: "URL of the document to process"
+  - id: document_type
+    type: STRING
+    required: true
+    description: "Type of document (pdf, docx, txt)"
+  - id: output_bucket
+    type: STRING
+    required: true
+    description: "Cloud storage bucket for processed files"
+  - id: openai_api_key
+    type: STRING
+    required: true
+    description: "OpenAI API key for text analysis"
+  - id: min_confidence
+    type: FLOAT
+    required: false
+    default: 0.8
+    description: "Minimum confidence score for extracted information"
+
+tasks:
+  - id: download_document
+    type: io.kestra.plugin.scripts.python.Script
+    inputFiles:
+      requirements.txt: |
+        requests==2.31.0
+        python-magic==0.4.27
+    script: |
+      import os
+      import requests
+      import magic
+      
+      response = requests.get('{{ inputs.document_url }}')
+      temp_path = f"/tmp/doc-{{ execution.id }}"
+      
+      with open(temp_path, 'wb') as f:
+          f.write(response.content)
+      
+      mime = magic.Magic(mime=True)
+      file_type = mime.from_file(temp_path)
+      
+      outputs = {}
+      outputs['file_path'] = temp_path
+      outputs['mime_type'] = file_type
+
+  - id: extract_text
+    type: io.kestra.plugin.scripts.python.Script
+    inputFiles:
+      requirements.txt: |
+        pytesseract==0.3.10
+        pdf2image==1.16.3
+        python-docx==1.0.1
+    script: |
+      import json
+      import pytesseract
+      from pdf2image import convert_from_path
+      from docx import Document
+      
+      def extract_from_pdf(path):
+          pages = convert_from_path(path)
+          text = ""
+          for page in pages:
+              text += pytesseract.image_to_string(page)
+          return text
+      
+      def extract_from_docx(path):
+          doc = Document(path)
+          return "\n".join([p.text for p in doc.paragraphs])
+      
+      file_path = '{{ outputs.download_document.file_path }}'
+      mime_type = '{{ outputs.download_document.mime_type }}'
+      
+      if "pdf" in mime_type:
+          text = extract_from_pdf(file_path)
+      elif "docx" in mime_type:
+          text = extract_from_docx(file_path)
+      else:
+          with open(file_path, 'r') as f:
+              text = f.read()
+      
+      outputs = {}
+      outputs['extracted_text'] = text
+
+  - id: analyze_content
+    type: io.kestra.plugin.scripts.python.Script
+    inputFiles:
+      requirements.txt: |
+        openai==1.3.5
+        tiktoken==0.5.1
+    script: |
+      import json
+      import openai
+      
+      openai.api_key = '{{ inputs.openai_api_key }}'
+      
+      text = '{{ outputs.extract_text.extracted_text }}'
+      
+      response = openai.ChatCompletion.create(
+          model="gpt-3.5-turbo",
+          messages=[
+              {"role": "system", "content": "Extract key information and summarize the document."},
+              {"role": "user", "content": text}
+          ]
+      )
+      
+      analysis = {
+          'summary': response.choices[0].message.content,
+          'confidence': response.choices[0].finish_reason == 'stop'
+      }
+      
+      outputs = {}
+      outputs['analysis'] = json.dumps(analysis)
+
+  - id: upload_processed
+    type: io.kestra.plugin.scripts.python.Script
+    inputFiles:
+      requirements.txt: |
+        boto3==1.33.6
+    script: |
+      import boto3
+      import json
+      import os
+      
+      s3 = boto3.client('s3')
+      
+      # Upload original file
+      file_path = '{{ outputs.download_document.file_path }}'
+      original_key = f"original/{{ execution.id }}/{{ os.path.basename('{{ inputs.document_url }}') }}"
+      s3.upload_file(file_path, '{{ inputs.output_bucket }}', original_key)
+      
+      # Upload metadata
+      metadata = {
+          'original_url': '{{ inputs.document_url }}',
+          'mime_type': '{{ outputs.download_document.mime_type }}',
+          'analysis': json.loads('{{ outputs.analyze_content.analysis }}')
+      }
+      
+      metadata_key = f"metadata/{{ execution.id }}/metadata.json"
+      s3.put_object(
+          Bucket='{{ inputs.output_bucket }}',
+          Key=metadata_key,
+          Body=json.dumps(metadata)
+      )
+      
+      outputs = {}
+      outputs['original_key'] = original_key
+      outputs['metadata_key'] = metadata_key
+
+errors:
+  - id: cleanup
+    type: io.kestra.plugin.scripts.python.Script
+    script: |
+      import os
+      import shutil
+      
+      temp_dir = f"/tmp/doc-{{ execution.id }}"
+      if os.path.exists(temp_dir):
+          shutil.rmtree(temp_dir)

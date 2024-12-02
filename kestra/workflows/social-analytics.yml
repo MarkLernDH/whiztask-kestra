@@ -1,0 +1,150 @@
+id: social-analytics
+namespace: marketplace.marketing
+
+description: |
+  Social media analytics workflow that collects metrics from various platforms,
+  analyzes engagement trends, and generates comprehensive reports.
+
+inputs:
+  - id: twitter_api_key
+    type: STRING
+    required: true
+    description: "Twitter API key"
+  - id: twitter_api_secret
+    type: STRING
+    required: true
+    description: "Twitter API secret"
+  - id: twitter_access_token
+    type: STRING
+    required: true
+    description: "Twitter access token"
+  - id: twitter_access_secret
+    type: STRING
+    required: true
+    description: "Twitter access token secret"
+  - id: target_accounts
+    type: STRING
+    required: true
+    description: "Comma-separated list of Twitter accounts to analyze"
+
+tasks:
+  - id: fetch_twitter_data
+    type: io.kestra.plugin.scripts.python.Script
+    inputFiles:
+      requirements.txt: |
+        tweepy==4.14.0
+        pandas==2.1.3
+    script: |
+      import json
+      import tweepy
+      import pandas as pd
+      from datetime import datetime, timedelta
+      
+      auth = tweepy.OAuthHandler(
+          '{{ inputs.twitter_api_key }}',
+          '{{ inputs.twitter_api_secret }}'
+      )
+      auth.set_access_token(
+          '{{ inputs.twitter_access_token }}',
+          '{{ inputs.twitter_access_secret }}'
+      )
+      
+      api = tweepy.API(auth)
+      
+      accounts = [x.strip() for x in '{{ inputs.target_accounts }}'.split(',')]
+      all_data = []
+      
+      for account in accounts:
+          try:
+              tweets = api.user_timeline(
+                  screen_name=account,
+                  count=100,
+                  tweet_mode="extended"
+              )
+              
+              for tweet in tweets:
+                  all_data.append({
+                      'account': account,
+                      'created_at': tweet.created_at.isoformat(),
+                      'text': tweet.full_text,
+                      'retweet_count': tweet.retweet_count,
+                      'favorite_count': tweet.favorite_count,
+                      'is_retweet': hasattr(tweet, 'retweeted_status')
+                  })
+          except Exception as e:
+              print(f"Error fetching data for {account}: {str(e)}")
+      
+      outputs = {}
+      outputs['twitter_data'] = json.dumps(all_data)
+
+  - id: analyze_engagement
+    type: io.kestra.plugin.scripts.python.Script
+    inputs:
+      twitter_data: "{{ outputs.fetch_twitter_data.twitter_data }}"
+    script: |
+      import json
+      import pandas as pd
+      from datetime import datetime
+      
+      # Load and process data
+      data = pd.DataFrame(json.loads('{{ inputs.twitter_data }}'))
+      data['created_at'] = pd.to_datetime(data['created_at'])
+      
+      # Calculate engagement metrics
+      engagement = data.groupby('account').agg({
+          'retweet_count': ['mean', 'max', 'sum'],
+          'favorite_count': ['mean', 'max', 'sum'],
+          'text': 'count'
+      }).round(2)
+      
+      engagement.columns = [
+          'avg_retweets', 'max_retweets', 'total_retweets',
+          'avg_likes', 'max_likes', 'total_likes',
+          'tweet_count'
+      ]
+      
+      # Calculate engagement rate
+      engagement['engagement_rate'] = (
+          (engagement['total_retweets'] + engagement['total_likes']) /
+          engagement['tweet_count']
+      ).round(2)
+      
+      outputs = {}
+      outputs['engagement_metrics'] = engagement.to_json()
+
+  - id: generate_report
+    type: io.kestra.plugin.scripts.python.Script
+    inputs:
+      engagement_metrics: "{{ outputs.analyze_engagement.engagement_metrics }}"
+    script: |
+      import json
+      import pandas as pd
+      from datetime import datetime
+      
+      # Load metrics
+      metrics = pd.read_json('{{ inputs.engagement_metrics }}')
+      
+      # Generate HTML report
+      html_report = """
+      <html>
+      <head>
+          <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              table { border-collapse: collapse; width: 100%; }
+              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              th { background-color: #f2f2f2; }
+              .header { margin-bottom: 20px; }
+          </style>
+      </head>
+      <body>
+          <div class="header">
+              <h1>Social Media Analytics Report</h1>
+              <p>Generated on: """ + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + """</p>
+          </div>
+          """ + metrics.to_html() + """
+      </body>
+      </html>
+      """
+      
+      outputs = {}
+      outputs['html_report'] = html_report

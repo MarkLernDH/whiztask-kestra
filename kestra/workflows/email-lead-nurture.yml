@@ -1,0 +1,124 @@
+id: email-lead-nurture
+namespace: marketplace.marketing
+
+description: |
+  Automated email lead nurture workflow that segments leads, personalizes content,
+  and sends targeted email campaigns while tracking engagement metrics.
+
+inputs:
+  - id: leads_csv_url
+    type: STRING
+    required: true
+    description: "URL to CSV file containing lead information"
+  - id: sendgrid_api_key
+    type: STRING
+    required: true
+    description: "SendGrid API key for sending emails"
+  - id: template_id
+    type: STRING
+    required: true
+    description: "SendGrid template ID for email content"
+
+tasks:
+  - id: fetch_leads
+    type: io.kestra.plugin.scripts.python.Script
+    inputFiles:
+      requirements.txt: |
+        pandas==2.1.3
+        requests==2.31.0
+    script: |
+      import pandas as pd
+      import requests
+      
+      response = requests.get('{{ inputs.leads_csv_url }}')
+      df = pd.read_csv(pd.io.common.StringIO(response.text))
+      
+      outputs = {}
+      outputs['leads'] = df.to_json(orient='records')
+
+  - id: segment_leads
+    type: io.kestra.plugin.scripts.python.Script
+    script: |
+      import json
+      import pandas as pd
+      
+      leads = pd.read_json('{{ outputs.fetch_leads.leads }}')
+      
+      def score_lead(row):
+          score = 0
+          if pd.notna(row['last_interaction']):
+              score += 2
+          if pd.notna(row['company_size']) and row['company_size'] > 100:
+              score += 3
+          return score
+      
+      leads['score'] = leads.apply(score_lead, axis=1)
+      leads['segment'] = pd.qcut(leads['score'], q=3, labels=['cold', 'warm', 'hot'])
+      
+      outputs = {}
+      outputs['segmented_leads'] = leads.to_json(orient='records')
+
+  - id: send_emails
+    type: io.kestra.plugin.scripts.python.Script
+    inputFiles:
+      requirements.txt: |
+        sendgrid==6.10.0
+        pandas==2.1.3
+    script: |
+      import json
+      import pandas as pd
+      from sendgrid import SendGridAPIClient
+      from sendgrid.helpers.mail import Mail, From, To, Subject, PlainTextContent, HtmlContent
+      
+      sg = SendGridAPIClient('{{ inputs.sendgrid_api_key }}')
+      leads = pd.read_json('{{ outputs.segment_leads.segmented_leads }}')
+      
+      results = []
+      for _, lead in leads.iterrows():
+          message = Mail(
+              from_email=From("marketing@example.com", "Marketing Team"),
+              to_emails=To(lead['email']),
+              subject=Subject(f"Special offer for {lead['company_name']}"),
+              template_id='{{ inputs.template_id }}'
+          )
+          
+          message.dynamic_template_data = {
+              'first_name': lead['first_name'],
+              'company_name': lead['company_name'],
+              'segment': lead['segment']
+          }
+          
+          try:
+              response = sg.send(message)
+              results.append({
+                  'email': lead['email'],
+                  'status': 'success',
+                  'status_code': response.status_code
+              })
+          except Exception as e:
+              results.append({
+                  'email': lead['email'],
+                  'status': 'failed',
+                  'error': str(e)
+              })
+      
+      outputs = {}
+      outputs['send_results'] = json.dumps(results)
+
+  - id: analyze_results
+    type: io.kestra.plugin.scripts.python.Script
+    script: |
+      import json
+      import pandas as pd
+      
+      results = pd.DataFrame(json.loads('{{ outputs.send_emails.send_results }}'))
+      
+      analysis = {
+          'total_sent': len(results),
+          'successful': len(results[results['status'] == 'success']),
+          'failed': len(results[results['status'] == 'failed']),
+          'success_rate': len(results[results['status'] == 'success']) / len(results) * 100
+      }
+      
+      outputs = {}
+      outputs['analysis'] = json.dumps(analysis)

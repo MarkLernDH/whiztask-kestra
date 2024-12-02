@@ -1,0 +1,29 @@
+datasources:
+  postgres:
+    url: jdbc:postgresql://postgres:5432/postgres
+    driverClassName: org.postgresql.Driver
+    username: postgres
+    password: postgres
+
+kestra:
+  server:
+    basicAuth:
+      enabled: true
+      username: "markzlerner@gmail.com"
+      password: "admin123"
+  repository:
+    type: postgres
+  storage:
+    type: local
+    local:
+      basePath: "/app/storage"
+  queue:
+    type: postgres
+  tasks:
+    tmpDir:
+      path: "/tmp/kestra-wd/tmp"
+  url: "http://localhost:8080/"
+  flows:
+    directory:
+      enabled: true
+      path: "/app/workflows"
