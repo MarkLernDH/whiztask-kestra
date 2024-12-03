@@ -15,14 +15,15 @@ CREATE TABLE IF NOT EXISTS auth.oauth_providers (
 );
 
 -- Insert or update the Google provider configuration
+-- Note: Actual credentials should be set via environment variables or secrets management
 INSERT INTO auth.oauth_providers (provider_id, provider_type, provider_details)
 VALUES (
     'google',
     'oauth',
     jsonb_build_object(
-        'client_id', '11503735689-id5eq8ac07erc1o64depen0bdjk9jbd6.apps.googleusercontent.com',
-        'secret', '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',
-        'redirect_uri', 'http://127.0.0.1:54321/auth/v1/callback'
+        'client_id', '${GOOGLE_OAUTH_CLIENT_ID}',
+        'secret', '${GOOGLE_OAUTH_CLIENT_SECRET}',
+        'redirect_uri', '${OAUTH_REDIRECT_URI}'
     )
 )
 ON CONFLICT (provider_id) 

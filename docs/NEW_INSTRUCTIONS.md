@@ -1071,3 +1071,50 @@ TaskWhiz will support both platform-hosted and self-hosted integrations, allowin
 
 ## Environment Setup
 {{ ... }}
+
+### Continuous Integration and Deployment (CI/CD)
+
+#### Workflow Synchronization Strategy
+We've implemented a robust GitHub Actions-based CI/CD pipeline for managing Kestra workflows:
+
+##### Key Features
+- **Automated Validation**: 
+  - Validates all workflow YAML files before deployment
+  - Ensures structural integrity and compliance with Kestra standards
+- **Selective Deployment**: 
+  - Triggered only by changes in `kestra/workflows/` directory
+  - Supports incremental workflow updates
+
+##### Workflow Triggers
+- **Push to `main` branch**
+- **Pull Requests targeting `main`**
+
+##### Deployment Process
+1. **Validation Stage**
+   - Uses `kestra-io/validate-action@develop`
+   - Checks workflow syntax and structure
+   - Prevents deployment of invalid workflows
+
+2. **Deployment Stage**
+   - Uses `kestra-io/deploy-action@master`
+   - Deploys validated workflows to `whiztask` namespace
+   - Preserves existing workflows to prevent unintended deletions
+
+##### Authentication
+- Secured using GitHub Repository Secrets
+  - `KESTRA_HOSTNAME`: Kestra instance URL
+  - `KESTRA_API_TOKEN`: Authentication credentials
+
+##### Local Development Workflow
+```bash
+# Validate workflows locally
+kestra flow validate kestra/workflows/
+
+# Deploy workflows to local Kestra instance
+kestra flow namespace update whiztask kestra/workflows/
+```
+
+#### Future Improvements
+- Implement comprehensive workflow testing
+- Add notification mechanisms for deployment status
+- Enhance validation with custom ruleset

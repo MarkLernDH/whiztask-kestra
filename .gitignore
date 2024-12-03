@@ -60,3 +60,19 @@ jspm_packages/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Sensitive configuration files
+*.env
+*.env.local
+*.env.development
+*.env.production
+*secret*
+*credentials*
+
+# Supabase sensitive configs
+supabase/secrets/
+supabase/**/*secret*
+supabase/**/*credentials*
+
+# Prevent accidental commits of sensitive SQL files
+supabase/**/*auth.sql

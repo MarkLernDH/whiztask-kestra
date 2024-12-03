@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AutomationPricingCard } from "@/components/automation-pricing-card"
-import { AutomationMediaCarousel } from "@/components/automation-media-carousel"
+import { AutomationPricingCard } from "@/components/ui/automation-pricing-card"
+import { AutomationMediaCarousel } from "@/components/ui/automation-media-carousel"
 import { Star, Clock, Award } from "lucide-react"
 
 interface Category {
@@ -96,7 +96,10 @@ async function getAutomation(id: string): Promise<Automation | null> {
     // Add default values for pricing fields
     price_per_use: (data as any).price_per_use || 5,
     usage_limit: (data as any).usage_limit || 100,
-    price_monthly: (data as any).price_monthly || 49.99
+    price_monthly: (data as any).price_monthly || 49.99,
+    category_id: "",
+    use_cases: [],
+    common_pain_points: []
   }
 
   return automation

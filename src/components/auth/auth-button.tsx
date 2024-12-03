@@ -15,6 +15,7 @@ function clearSupabaseCookies() {
 
 export default function AuthButton() {
   const supabase = createClientComponentClient();
+  const router = useRouter();
 
   const handleAuth = async () => {
     try {
@@ -30,8 +31,9 @@ export default function AuthButton() {
           redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: {
             access_type: 'offline',
-            prompt: 'select_account',
+            prompt: 'consent select_account',
           },
+          flowType: 'pkce',
         }
       });
 
@@ -40,6 +42,7 @@ export default function AuthButton() {
         return;
       }
 
+      // Let Supabase handle the redirect
       if (data?.url) {
         window.location.href = data.url;
       }
@@ -49,8 +52,12 @@ export default function AuthButton() {
   };
 
   return (
-    <Button onClick={handleAuth} variant="default">
-      Continue with Google
+    <Button
+      onClick={handleAuth}
+      variant="ghost"
+      className="h-9 px-4 text-sm font-medium"
+    >
+      Sign In
     </Button>
   );
 }

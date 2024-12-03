@@ -9,13 +9,13 @@ services:
       - "54323:3000"
     environment:
       STUDIO_PG_META_URL: http://meta:8080
-      POSTGRES_PASSWORD: your-super-secret-and-long-postgres-password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your-super-secret-and-long-postgres-password}
       DEFAULT_ORGANIZATION: Default Organization
       DEFAULT_PROJECT: Default Project
       SUPABASE_URL: http://kong:8000
       SUPABASE_PUBLIC_URL: http://localhost:54321
-      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
-      SUPABASE_SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
     depends_on:
       - rest
       - auth
@@ -57,18 +57,18 @@ services:
       GOTRUE_DB_HOST: postgres
       GOTRUE_DB_PORT: 5432
       GOTRUE_DB_USER: supabase_auth_admin
-      GOTRUE_DB_PASSWORD: your-super-secret-and-long-postgres-password
+      GOTRUE_DB_PASSWORD: ${POSTGRES_PASSWORD:-your-super-secret-and-long-postgres-password}
       GOTRUE_DB_NAME: postgres
       GOTRUE_SITE_URL: http://localhost:3000
       GOTRUE_URI_ALLOW_LIST: http://localhost:3000
       GOTRUE_DISABLE_SIGNUP: "false"
-      GOTRUE_JWT_SECRET: your-super-secret-jwt-token-with-at-least-32-characters-long
+      GOTRUE_JWT_SECRET: ${SUPABASE_JWT_SECRET}
       GOTRUE_JWT_AUD: authenticated
       GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
       GOTRUE_EXTERNAL_EMAIL_ENABLED: "false"
       GOTRUE_MAILER_AUTOCONFIRM: "true"
       GOTRUE_SMS_AUTOCONFIRM: "true"
-      GOTRUE_OPERATOR_TOKEN: super-secret-operator-token
+      GOTRUE_OPERATOR_TOKEN: ${SUPABASE_OPERATOR_TOKEN}
 
   rest:
     container_name: supabase-rest
@@ -77,10 +77,10 @@ services:
       - postgres
     restart: unless-stopped
     environment:
-      PGRST_DB_URI: postgres://authenticator:your-super-secret-and-long-postgres-password@postgres:5432/postgres
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD:-your-super-secret-and-long-postgres-password}@postgres:5432/postgres
       PGRST_DB_SCHEMAS: public,storage
       PGRST_DB_ANON_ROLE: anon
-      PGRST_JWT_SECRET: your-super-secret-jwt-token-with-at-least-32-characters-long
+      PGRST_JWT_SECRET: ${SUPABASE_JWT_SECRET}
       PGRST_DB_USE_LEGACY_GUCS: "false"
 
   storage:
@@ -91,12 +91,12 @@ services:
       - rest
     restart: unless-stopped
     environment:
-      ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
-      SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+      ANON_KEY: ${SUPABASE_ANON_KEY}
+      SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
       PROJECT_REF: storage
       POSTGREST_URL: http://rest:3000
-      PGRST_JWT_SECRET: your-super-secret-jwt-token-with-at-least-32-characters-long
-      DATABASE_URL: postgres://supabase_storage_admin:your-super-secret-and-long-postgres-password@postgres:5432/postgres
+      PGRST_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD:-your-super-secret-and-long-postgres-password}@postgres:5432/postgres
       FILE_SIZE_LIMIT: 52428800
       STORAGE_BACKEND: file
       FILE_STORAGE_BACKEND_PATH: /var/lib/storage
@@ -118,7 +118,7 @@ services:
       PG_META_DB_PORT: 5432
       PG_META_DB_NAME: postgres
       PG_META_DB_USER: supabase_admin
-      PG_META_DB_PASSWORD: your-super-secret-and-long-postgres-password
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD:-your-super-secret-and-long-postgres-password}
 
   postgres:
     container_name: supabase-db
@@ -137,7 +137,7 @@ services:
       - "54320:5432"
     environment:
       POSTGRES_HOST: /var/run/postgresql
-      POSTGRES_PASSWORD: your-super-secret-and-long-postgres-password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your-super-secret-and-long-postgres-password}
     volumes:
       - ./volumes/db/data:/var/lib/postgresql/data
       - ./volumes/db/init:/docker-entrypoint-initdb.d
@@ -164,11 +164,11 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: supabase_admin
-      DB_PASSWORD: your-super-secret-and-long-postgres-password
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-your-super-secret-and-long-postgres-password}
       DB_NAME: postgres
       DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
       DB_ENC_KEY: supabaserealtime
-      API_JWT_SECRET: your-super-secret-jwt-token-with-at-least-32-characters-long
+      API_JWT_SECRET: ${SUPABASE_JWT_SECRET}
       FLY_ALLOC_ID: fly123
       FLY_APP_NAME: realtime
       SECRET_KEY_BASE: UpNVntn3cDxHJpq99YMc1T1AQgQpc8kfYxHE84kqXGE=
@@ -182,12 +182,12 @@ services:
     restart: unless-stopped
     environment:
       LOGFLARE_NODE_HOST: analytics
-      LOGFLARE_API_KEY: your-super-secret-and-long-logflare-key
+      LOGFLARE_API_KEY: ${SUPABASE_LOGFLARE_KEY}
       LOGFLARE_SINGLE_TENANT: "true"
       LOGFLARE_SUPABASE_MODE: "true"
-      LOGFLARE_SUPABASE_ROOT_KEY: your-super-secret-jwt-token-with-at-least-32-characters-long
+      LOGFLARE_SUPABASE_ROOT_KEY: ${SUPABASE_JWT_SECRET}
       LOGFLARE_SUPABASE_CONFIG: "{}"
-      DATABASE_URL: postgres://supabase_analytics_admin:your-super-secret-and-long-postgres-password@postgres:5432/postgres
+      DATABASE_URL: postgres://supabase_analytics_admin:${POSTGRES_PASSWORD:-your-super-secret-and-long-postgres-password}@postgres:5432/postgres
       LOGFLARE_MIN_CLUSTER_SIZE: 1
     volumes:
       - ./volumes/analytics:/var/lib/logflare
@@ -197,11 +197,11 @@ services:
     image: supabase/edge-runtime:v1.22.3
     restart: unless-stopped
     environment:
-      JWT_SECRET: your-super-secret-jwt-token-with-at-least-32-characters-long
+      JWT_SECRET: ${SUPABASE_JWT_SECRET}
       SUPABASE_URL: http://kong:8000
-      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
-      SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
-      SUPABASE_DB_URL: postgresql://postgres:your-super-secret-and-long-postgres-password@postgres:5432/postgres
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_KEY}
+      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD:-your-super-secret-and-long-postgres-password}@postgres:5432/postgres
       VERIFY_JWT: "false"
     volumes:
       - ./volumes/functions:/home/deno/functions

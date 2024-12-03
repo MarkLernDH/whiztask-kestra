@@ -6,19 +6,20 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const requestUrl = new URL(request.url);
-    const code = requestUrl.searchParams.get('code');
-
-    if (!code) {
-      return NextResponse.redirect(new URL('/?error=no_code', request.url));
-    }
-
     const cookieStore = await cookies();
     const supabase = createRouteHandlerClient({ 
       cookies: () => cookieStore 
     });
 
-    // Exchange the code for a session (Supabase handles PKCE verification)
+    const requestUrl = new URL(request.url);
+    const code = requestUrl.searchParams.get('code');
+
+    if (!code) {
+      console.error('No code parameter received');
+      return NextResponse.redirect(new URL('/?error=no_code', request.url));
+    }
+
+    // Exchange the code for a session
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
@@ -26,8 +27,8 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL(`/?error=${error.message}`, request.url));
     }
 
-    // Successful authentication, redirect to dashboard
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    // Successful authentication, redirect to home page with absolute URL
+    return NextResponse.redirect(new URL('/', process.env.NEXT_PUBLIC_APP_URL));
   } catch (error) {
     console.error('Callback error:', error);
     return NextResponse.redirect(new URL('/?error=unknown', request.url));
